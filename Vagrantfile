@@ -69,36 +69,5 @@ Vagrant.configure("2") do |config|
   # SHELL
 
   # Bootstrap Centreon
-  config.vm.provision "shell", inline: <<-SHELL
-    timedatectl set-timezone Europe/Paris
-    setenforce 0
-    sed -i 's/enforcing/disabled/' /etc/selinux/config
-    yum upgrade -y
-    yum install -y centos-release-scl wget curl
-    yum install -y yum-utils http://yum.centreon.com/standard/19.10/el7/stable/noarch/RPMS/centreon-release-19.10-1.el7.centos.noarch.rpm
-    yum-config-manager --enable 'centreon-testing*'
-    #curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
-    yum install -y centreon
-    systemctl daemon-reload
-    systemctl restart mysql
-    echo "date.timezone = Europe/Paris" > /etc/opt/rh/rh-php72/php.d/php-timezone.ini
-    systemctl restart rh-php72-php-fpm
-    systemctl stop firewalld
-    systemctl disable firewalld
-    systemctl enable httpd24-httpd
-    systemctl enable snmpd
-    systemctl enable snmptrapd
-    systemctl enable rh-php72-php-fpm
-    systemctl enable centcore
-    systemctl enable centreontrapd
-    systemctl enable cbd
-    systemctl enable centengine
-    systemctl enable centreon
-    systemctl start rh-php72-php-fpm
-    systemctl start httpd24-httpd
-    systemctl start mysqld
-    systemctl start cbd
-    systemctl start snmpd
-    systemctl start snmptrapd
-  SHELL
+  config.vm.provision "shell", path: "provision.sh"
 end
