@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -x
 
 MYSQL_HOST="localhost"
 MYSQL_PORT="3306"
@@ -200,7 +200,7 @@ installPlugins() {
     )
 
     CENTREON_HOST="http://localhost"
-    CURL_CMD="curl -q -o /dev/null"
+    CURL_CMD="curl "
     API_TOKEN=$(curl -q -d "username=admin&password=${CENTREON_ADMIN_PASSWD}" \
         "${CENTREON_HOST}/centreon/api/index.php?action=authenticate" \
         | cut -f2 -d":" | sed -e "s/\"//g" -e "s/}//"
@@ -212,6 +212,7 @@ installPlugins() {
             -H "centreon-auth-token: ${API_TOKEN}"\
             -d "{\"pluginpack\":[${PLUGIN}]}" \
             "${CENTREON_HOST}/centreon/api/index.php?object=centreon_pp_manager_pluginpack&action=installupdate"
+        sleep 2
     done
 }
 
@@ -270,12 +271,6 @@ InstallDbCentreon # Configure database
 su - centreon -c "/opt/rh/rh-php72/root/bin/php /usr/share/centreon/cron/centreon-partitioning.php"
 systemctl restart cbd
 
-# Install Plugins
-installPlugins
-
-# Install widgets and configure
-installWidgets
-
 # Enable all others services
 systemctl enable httpd24-httpd
 systemctl enable snmpd
@@ -296,3 +291,9 @@ systemctl start mysqld
 systemctl start cbd
 systemctl start snmpd
 systemctl start snmptrapd
+
+# Install widgets and configure
+installWidgets
+
+# Install Plugins
+installPlugins
