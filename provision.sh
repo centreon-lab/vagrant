@@ -112,6 +112,7 @@ yum install -y centos-release-scl wget curl
 yum install -y yum-utils http://yum.centreon.com/standard/19.10/el7/stable/noarch/RPMS/centreon-release-19.10-1.el7.centos.noarch.rpm
 yum-config-manager --enable 'centreon-testing*'
 #curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
+#yum install -y centreon-base-config-centreon-engine
 yum install -y centreon
 
 echo "date.timezone = Europe/Paris" > /etc/opt/rh/rh-php72/php.d/php-timezone.ini
