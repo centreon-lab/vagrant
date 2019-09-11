@@ -60,6 +60,13 @@ Vagrant.configure("2") do |config|
   # View the documentation for the provider you are using for more
   # information on available options.
 
+  Vagrant.configure("2") do |config|
+    config.vm.provider :libvirt do |libvirt|
+      libvirt.cpus = 1
+      libvirt.memory = 1024
+    end
+  end
+
   # Enable provisioning with a shell script. Additional provisioners such as
   # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
   # documentation for more information about their specific syntax and use.
