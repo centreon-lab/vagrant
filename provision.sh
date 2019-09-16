@@ -134,7 +134,7 @@ installEMS() {
             -e "s/##CENTREON_HOST_DATABASE##/${MYSQL_HOST}/g" \
             -e "s/##CENTREON_USER_DB_PASSWORD##/${MYSQL_PASSWD}/g" \
             -e "s/##MYSQL_ROOT_PASSWORD##/${MYSQL_ROOT_PASSWORD}/g" \
-            /tmp/scripts/script.exp
+            /tmp/map-install.exp
     fi
     if [ ! "$(rpm -aq | grep centreon-bam-server)" ]; then
         yum install -y $RPM_CENTREON_BAM
@@ -204,7 +204,7 @@ timedatectl set-timezone Europe/Paris
 setenforce 0
 sed -i 's/enforcing/disabled/' /etc/selinux/config
 yum upgrade -y
-yum install -y centos-release-scl wget curl
+yum install -y centos-release-scl wget curl unzip
 yum install -y yum-utils http://yum.centreon.com/standard/19.10/el7/stable/noarch/RPMS/centreon-release-19.10-1.el7.centos.noarch.rpm
 yum-config-manager --enable 'centreon-testing*'
 #curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
@@ -251,3 +251,11 @@ installPlugins
 
 # Install EMS components
 installEMS
+
+# Install licenses
+cd /tmp
+unzip licenses.zip
+mv -v licenses/epp.license /etc/centreon/license.d/epp.license
+mv -v licenses/map.license /etc/centreon/license.d/map.license
+mv -v licenses/bam.license /etc/centreon/license.d/bam.license
+mv -v licenses/mbi.license /etc/centreon/license.d/mbi.license
