@@ -75,4 +75,8 @@ Vagrant.configure("2") do |config|
 
   # Bootstrap Centreon
   config.vm.provision "shell", path: "provision.sh"
+  config.vm.provision "file", source: "./licenses/epp.license", destination: "/etc/centreon/license.d/epp.license"
+  config.vm.provision "file", source: "./licenses/map.license", destination: "/etc/centreon/license.d/map.license"
+  config.vm.provision "file", source: "./licenses/bam.license", destination: "/etc/centreon/license.d/bam.license"
+  config.vm.provision "file", source: "./licenses/mbi.license", destination: "/etc/centreon/license.d/mbi.license"
 end

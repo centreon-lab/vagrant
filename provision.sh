@@ -9,6 +9,11 @@ CENTREON_ADMIN_NAME="Administrator"
 CENTREON_ADMIN_EMAIL="admin@admin.co"
 CENTREON_ADMIN_PASSWD="change123"
 
+# EMS vars
+RPM_CENTREON_MAP="http://repo.centreon.com/yum/internal/19.10/el7/noarch/map-server/centreon-map-server-19.10.0-1568193280.5b8a03794/centreon-map-server-19.10.0-1568193280.5b8a03794.el7.noarch.rpm"
+RPM_CENTREON_BAM="http://repo.centreon.com/yum/internal/19.10/el7/noarch/bam/centreon-bam-server-19.10.0-1568128489.4cc13011/centreon-bam-server-19.10.0-1568128489.4cc13011.el7.centos.noarch.rpm"
+RPM_CENTREON_MBI="http://repo.centreon.com/yum/internal/19.10/el7/noarch/mbi-web/centreon-bi-server-19.10.0-1568128491.46cbac2/centreon-bi-server-19.10.0-1568128491.46cbac2.el7.centos.noarch.rpm"
+
 InstallDbCentreon() {
 
     CENTREON_HOST="http://localhost"
@@ -104,6 +109,97 @@ installWidgets() {
     done
 }
 
+installEMS() {
+
+    # After Centreon configuration, install modules EMS
+    if [ ! "$(rpm -aq | grep centreon-map-server)" ]; then
+        MYSQL_HOST_CLIENT=$( \
+            echo "SELECT host FROM information_schema.processlist WHERE ID=connection_id();" \
+            | mysql -u root --password="${MYSQL_ROOT_PASSWORD}" -h ${MYSQL_HOST} \
+            | sed 1d | cut -f1 -d":" \
+        )
+        echo "CREATE USER 'centreon_map'@'${MYSQL_HOST_CLIENT}' IDENTIFIED BY '${MYSQL_PASSWD}';" \
+            | mysql -u root --password="${MYSQL_ROOT_PASSWORD}" -h ${MYSQL_HOST}
+        echo "GRANT SELECT ON centreon_storage.* TO 'centreon_map'@'${MYSQL_HOST_CLIENT}';" \
+            | mysql -u root --password="${MYSQL_ROOT_PASSWORD}" -h ${MYSQL_HOST}
+        echo "GRANT SELECT, INSERT ON centreon.* TO 'centreon_map'@'${MYSQL_HOST_CLIENT}';" \
+            | mysql -u root --password="${MYSQL_ROOT_PASSWORD}" -h ${MYSQL_HOST}
+
+        yum install -y $RPM_CENTREON_MAP expect
+        cd /etc/centreon-studio
+        find /etc/centreon-studio -type f -name \*.sh | xargs chmod -v +x
+        export PATH="$PATH:/etc/centreon-studio"
+        sed -i \
+            -e "s/##CENTREON_ADMIN_PASSWORD##/${CENTREON_ADMIN_PASSWD}/g" \
+            -e "s/##CENTREON_HOST_DATABASE##/${MYSQL_HOST}/g" \
+            -e "s/##CENTREON_USER_DB_PASSWORD##/${MYSQL_PASSWD}/g" \
+            -e "s/##MYSQL_ROOT_PASSWORD##/${MYSQL_ROOT_PASSWORD}/g" \
+            /tmp/scripts/script.exp
+    fi
+    if [ ! "$(rpm -aq | grep centreon-bam-server)" ]; then
+        yum install -y $RPM_CENTREON_BAM
+    fi
+    if [ ! "$(rpm -aq | grep centreon-bi-server)" ]; then
+        MYSQL_HOST_CLIENT=$( \
+            echo "SELECT host FROM information_schema.processlist WHERE ID=connection_id();" \
+            | mysql -u root --password="${MYSQL_ROOT_PASSWORD}" -h ${MYSQL_HOST} \
+            | sed 1d | cut -f1 -d":" \
+        )
+        echo "CREATE USER 'centreonbi'@'${MYSQL_HOST_CLIENT}' IDENTIFIED BY '${MYSQL_PASSWD}';" \
+            | mysql -u root --password="${MYSQL_ROOT_PASSWORD}" -h ${MYSQL_HOST}
+        echo "GRANT SELECT ON centreon_storage.* TO 'centreonbi'@'${MYSQL_HOST_CLIENT}';" \
+            | mysql -u root --password="${MYSQL_ROOT_PASSWORD}" -h ${MYSQL_HOST}
+        echo "GRANT SELECT, INSERT ON centreon.* TO 'centreonbi'@'${MYSQL_HOST_CLIENT}';" \
+            | mysql -u root --password="${MYSQL_ROOT_PASSWORD}" -h ${MYSQL_HOST}
+        yum install -y $RPM_CENTREON_MBI
+    fi
+
+    # Install widgets
+    WIDGETS=(
+        bam-ba-list
+        mbi-ba-mtbf-mtrs
+        mbi-ba-availability-graph-day
+        mbi-ba-availability-gauge
+        mbi-ba-availability-graph-month
+        mbi-bv-availability-graph-month
+        mbi-hgs-hc-by-host-mtbf-mtrs
+        mbi-hg-availability-by-host-graph-day
+        mbi-hg-availability-by-hc-graph-month
+        mbi-hgs-availability-by-hg-graph-month
+        mbi-hgs-performances-Top-X
+        mbi-hgs-hcs-scs-metric-performance-day
+        mbi-metric-capacity-planning
+        mbi-hgs-hc-by-service-mtbf-mtrs
+        mbi-storage-list-near-saturation
+        mbi-hgs-hc-by-service-mtbf-mtrs
+        mbi-typical-performance-day
+    )
+
+    CENTREON_HOST="http://localhost"
+    CURL_CMD="curl -q -o /dev/null"
+    API_TOKEN=$(curl -q -d "username=admin&password=${CENTREON_ADMIN_PASSWD}" \
+        "${CENTREON_HOST}/centreon/api/index.php?action=authenticate" \
+        | cut -f2 -d":" | sed -e "s/\"//g" -e "s/}//"
+    )
+
+    ${CURL_CMD} -X POST \
+        -H "Content-Type: application/json" \
+        -H "centreon-auth-token: ${API_TOKEN}"\
+        "${CENTREON_HOST}/centreon/api/index.php?object=centreon_module&action=install&id=centreon-bam-server&type=module"
+    ${CURL_CMD} -X POST \
+        -H "Content-Type: application/json" \
+        -H "centreon-auth-token: ${API_TOKEN}"\
+        "${CENTREON_HOST}/centreon/api/index.php?object=centreon_module&action=install&id=centreon-bi-server&type=module"
+
+    for WIDGET in "${WIDGETS[@]}"; do
+        # Configure widget in Centreon
+        ${CURL_CMD} -X POST \
+            -H "Content-Type: application/json" \
+            -H "centreon-auth-token: ${API_TOKEN}"\
+            "${CENTREON_HOST}/centreon/api/index.php?object=centreon_module&action=install&id=${WIDGET}&type=widget"
+    done
+}
+
 timedatectl set-timezone Europe/Paris
 setenforce 0
 sed -i 's/enforcing/disabled/' /etc/selinux/config
@@ -152,3 +248,6 @@ installWidgets
 
 # Install Plugins
 installPlugins
+
+# Install EMS components
+installEMS
