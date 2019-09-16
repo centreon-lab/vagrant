@@ -43,7 +43,7 @@ if {$force_conservative} {
 
 
 set timeout -1
-spawn configure.sh
+spawn /etc/centreon-studio/configure.sh
 match_max 100000
 expect -exact "################################################\r
 #### Centreon-Studio configuration settings ####\r

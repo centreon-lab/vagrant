@@ -135,6 +135,10 @@ installEMS() {
             -e "s/##CENTREON_USER_DB_PASSWORD##/${MYSQL_PASSWD}/g" \
             -e "s/##MYSQL_ROOT_PASSWORD##/${MYSQL_ROOT_PASSWORD}/g" \
             /tmp/map-install.exp
+        expect -f /tmp/map-install.exp
+        systemctl restart cbd
+        systemctl start tomcat
+        systemctl enable tomcat        
     fi
     if [ ! "$(rpm -aq | grep centreon-bam-server)" ]; then
         yum install -y $RPM_CENTREON_BAM
