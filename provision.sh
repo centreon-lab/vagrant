@@ -10,9 +10,9 @@ CENTREON_ADMIN_EMAIL="admin@admin.co"
 CENTREON_ADMIN_PASSWD="change123"
 
 # EMS vars
-RPM_CENTREON_MAP="http://repo.centreon.com/yum/internal/19.10/el7/noarch/map-server/centreon-map-server-19.10.0-1568193280.5b8a03794/centreon-map-server-19.10.0-1568193280.5b8a03794.el7.noarch.rpm"
-RPM_CENTREON_BAM="http://repo.centreon.com/yum/internal/19.10/el7/noarch/bam/centreon-bam-server-19.10.0-1568128489.4cc13011/centreon-bam-server-19.10.0-1568128489.4cc13011.el7.centos.noarch.rpm"
-RPM_CENTREON_MBI="http://repo.centreon.com/yum/internal/19.10/el7/noarch/mbi-web/centreon-bi-server-19.10.0-1568128491.46cbac2/centreon-bi-server-19.10.0-1568128491.46cbac2.el7.centos.noarch.rpm"
+RPM_CENTREON_MAP="http://repo.centreon.com/yum/internal/19.10/el7/noarch/map-server/centreon-map-server-19.10.0-1568982811.053b6d6a0/centreon-map-server-19.10.0-1568982811.053b6d6a0.el7.noarch.rpm"
+RPM_CENTREON_BAM="http://repo.centreon.com/yum/internal/19.10/el7/noarch/bam/centreon-bam-server-19.10.0-1569000359.bc39b8a1/centreon-bam-server-19.10.0-1569000359.bc39b8a1.el7.centos.noarch.rpm"
+RPM_CENTREON_MBI="http://repo.centreon.com/yum/internal/19.10/el7/noarch/mbi-web/centreon-bi-server-19.10.0-1568985622.d46f005/centreon-bi-server-19.10.0-1568985622.d46f005.el7.centos.noarch.rpm"
 
 InstallDbCentreon() {
 
@@ -127,6 +127,7 @@ installEMS() {
 
         yum install -y $RPM_CENTREON_MAP expect
         cd /etc/centreon-studio
+        mv -v /tmp/map-install.sh /etc/centreon-studio/map-install.sh
         find /etc/centreon-studio -type f -name \*.sh | xargs chmod -v +x
         export PATH="$PATH:/etc/centreon-studio"
         sed -i \
@@ -134,11 +135,11 @@ installEMS() {
             -e "s/##CENTREON_HOST_DATABASE##/${MYSQL_HOST}/g" \
             -e "s/##CENTREON_USER_DB_PASSWORD##/${MYSQL_PASSWD}/g" \
             -e "s/##MYSQL_ROOT_PASSWORD##/${MYSQL_ROOT_PASSWORD}/g" \
-            /tmp/map-install.exp
-        expect -f /tmp/map-install.exp
+            /etc/centreon-studio/map-install.sh
+        ./map-install.sh
         systemctl restart cbd
         systemctl start tomcat
-        systemctl enable tomcat        
+        systemctl enable tomcat
     fi
     if [ ! "$(rpm -aq | grep centreon-bam-server)" ]; then
         yum install -y $RPM_CENTREON_BAM
@@ -211,8 +212,12 @@ yum upgrade -y
 yum install -y centos-release-scl wget curl unzip
 yum install -y yum-utils http://yum.centreon.com/standard/19.10/el7/stable/noarch/RPMS/centreon-release-19.10-1.el7.centos.noarch.rpm
 yum-config-manager --enable 'centreon-testing*'
-#curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
-#yum install -y centreon-base-config-centreon-engine
+##curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
+##yum install -y centreon-base-config-centreon-engine
+
+# Devel version
+wget -O /etc/yum.repos.d/centreon-web-devel.repo http://repo.centreon.com/yum/internal/19.10/el7/noarch/web/centreon-web-19.10.0-beta.3-1568886926.1cdc58ef4/centreon-internal.repo
+sed -i 's/srvi-repo.int.centreon.com/repo.centreon.com/' /etc/yum.repos.d/centreon-web-devel.repo
 yum install -y centreon
 
 echo "date.timezone = Europe/Paris" > /etc/opt/rh/rh-php72/php.d/php-timezone.ini

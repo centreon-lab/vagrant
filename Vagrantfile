@@ -76,6 +76,8 @@ Vagrant.configure("2") do |config|
 
   # Bootstrap Centreon
   config.vm.provision "file", source: "./files/licenses.zip", destination: "/tmp/licenses.zip"
-  config.vm.provision "file", source: "./files/map-install.exp", destination: "/tmp/map-install.exp"
+  config.vm.provision "file", source: "./files/map-install.sh", destination: "/tmp/map-install.sh"
   config.vm.provision "shell", path: "provision.sh"
+
+  #config.vm.provision "shell", inline: "/tmp/map-install.exp"
 end
