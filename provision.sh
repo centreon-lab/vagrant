@@ -10,9 +10,9 @@ CENTREON_ADMIN_EMAIL="admin@admin.co"
 CENTREON_ADMIN_PASSWD="change123"
 
 # EMS vars
-RPM_CENTREON_MAP="http://repo.centreon.com/yum/internal/19.10/el7/noarch/map-server/centreon-map-server-19.10.0-1568982811.053b6d6a0/centreon-map-server-19.10.0-1568982811.053b6d6a0.el7.noarch.rpm"
-RPM_CENTREON_BAM="http://repo.centreon.com/yum/internal/19.10/el7/noarch/bam/centreon-bam-server-19.10.0-1569000359.bc39b8a1/centreon-bam-server-19.10.0-1569000359.bc39b8a1.el7.centos.noarch.rpm"
-RPM_CENTREON_MBI="http://repo.centreon.com/yum/internal/19.10/el7/noarch/mbi-web/centreon-bi-server-19.10.0-1568985622.d46f005/centreon-bi-server-19.10.0-1568985622.d46f005.el7.centos.noarch.rpm"
+RPM_CENTREON_MAP="http://repo.centreon.com/yum/internal/19.10/el7/noarch/map-server/centreon-map-server-19.10.0-1569320612.9704d23a8/centreon-map-server-19.10.0-1569320612.9704d23a8.el7.noarch.rpm"
+RPM_CENTREON_BAM="http://repo.centreon.com/yum/internal/19.10/el7/noarch/bam/centreon-bam-server-19.10.0-1569333326.a6dcd7e1/centreon-bam-server-19.10.0-1569333326.a6dcd7e1.el7.centos.noarch.rpm"
+RPM_CENTREON_MBI="http://repo.centreon.com/yum/internal/19.10/el7/noarch/mbi-web/centreon-bi-server-19.10.0-1569326612.d46f005/centreon-bi-server-19.10.0-1569326612.d46f005.el7.centos.noarch.rpm"
 
 function InstallDbCentreon() {
 
