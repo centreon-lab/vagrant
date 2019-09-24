@@ -34,7 +34,7 @@ InstallDbCentreon() {
         --data "admin_password=${CENTREON_ADMIN_PASSWD}&confirm_password=${CENTREON_ADMIN_PASSWD}&firstname=${CENTREON_ADMIN_NAME}&lastname=${CENTREON_ADMIN_NAME}&email=${CENTREON_ADMIN_EMAIL}"
     ${CURL_CMD} "${CENTREON_HOST}/centreon/install/steps/step.php?action=nextStep"
     ${CURL_CMD} "${CENTREON_HOST}/centreon/install/steps/process/process_step6.php" \
-        --data "address=${MYSQL_HOST}&port=${MYSQL_PORT}&root_password=${MYSQL_ROOT_PASSWORD}&db_configuration=centreon&db_storage=centreon_storage&db_user=${MYSQL_USER}&db_password=${MYSQL_PASSWD}&db_password_confirm=${MYSQL_PASSWD}"
+        --data "address=${MYSQL_HOST}&port=${MYSQL_PORT}&root_user=root&root_password=${MYSQL_ROOT_PASSWORD}&db_configuration=centreon&db_storage=centreon_storage&db_user=${MYSQL_USER}&db_password=${MYSQL_PASSWD}&db_password_confirm=${MYSQL_PASSWD}"
     ${CURL_CMD} "${CENTREON_HOST}/centreon/install/steps/step.php?action=nextStep"
     ${CURL_CMD} "${CENTREON_HOST}/centreon/install/steps/process/configFileSetup.php" -X POST
     ${CURL_CMD} "${CENTREON_HOST}/centreon/install/steps/process/installConfigurationDb.php" -X POST
@@ -205,11 +205,27 @@ installEMS() {
     done
 }
 
+sendLicenses() {
+    CENTREON_HOST="http://localhost"
+    CURL_CMD="curl -q -o /dev/null"
+    API_TOKEN=$(curl -q -d "username=admin&password=${CENTREON_ADMIN_PASSWD}" \
+        "${CENTREON_HOST}/centreon/api/index.php?action=authenticate" \
+        | cut -f2 -d":" | sed -e "s/\"//g" -e "s/}//"
+    )
+
+    ${CURL_CMD} -X POST \
+        -H "accept: application/json" \
+        -H "Content-Type: multipart/form-data" \
+        -H "centreon-auth-token: ${API_TOKEN}"\
+        -F "file[]=@/tmp/licenses.zip" \
+        "${CENTREON_HOST}/centreon/api/index.php?object=centreon_license&action=file"
+}
+
 timedatectl set-timezone Europe/Paris
 setenforce 0
 sed -i 's/enforcing/disabled/' /etc/selinux/config
 yum upgrade -y
-yum install -y centos-release-scl wget curl unzip
+yum install -y centos-release-scl wget curl
 yum install -y yum-utils http://yum.centreon.com/standard/19.10/el7/stable/noarch/RPMS/centreon-release-19.10-1.el7.centos.noarch.rpm
 yum-config-manager --enable 'centreon-testing*'
 ##curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
@@ -252,6 +268,9 @@ systemctl start cbd
 systemctl start snmpd
 systemctl start snmptrapd
 
+# Install License files
+sendLicenses
+
 # Install widgets and configure
 installWidgets
 
@@ -260,11 +279,3 @@ installPlugins
 
 # Install EMS components
 installEMS
-
-# Install licenses
-cd /tmp
-unzip licenses.zip
-mv -v licenses/epp.license /etc/centreon/license.d/epp.license
-mv -v licenses/map.license /etc/centreon/license.d/map.license
-mv -v licenses/bam.license /etc/centreon/license.d/bam.license
-mv -v licenses/mbi.license /etc/centreon/license.d/mbi.license
