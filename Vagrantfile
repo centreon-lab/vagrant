@@ -78,5 +78,5 @@ Vagrant.configure("2") do |config|
   config.vm.provision "file", source: "./files/licenses.zip", destination: "/tmp/licenses.zip"
   config.vm.provision "file", source: "./files/map-install.sh", destination: "/tmp/map-install.sh"
   config.vm.provision "shell", path: "provision.sh"
-
+  config.vm.provision "file", source: "./files/centreon-profile.sh", destination: "/etc/profile.d/centreon.sh"
 end
