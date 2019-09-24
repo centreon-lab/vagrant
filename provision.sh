@@ -9,7 +9,7 @@ CENTREON_ADMIN_NAME="Administrator"
 CENTREON_ADMIN_EMAIL="admin@admin.co"
 CENTREON_ADMIN_PASSWD="change123"
 
-InstallDbCentreon() {
+function InstallDbCentreon() {
 
     CENTREON_HOST="http://localhost"
     COOKIE_FILE="/tmp/install.cookie"
@@ -45,7 +45,7 @@ InstallDbCentreon() {
         --data "send_statistics=1"
 }
 
-installPlugins() {
+function installPlugins() {
 
     SLUGS=$(wget -O - -q 'https://api.imp.centreon.com/api/pluginpack/pluginpack?sort=catalog_level&by=asc&page[number]=1&page[size]=20')
 
@@ -74,7 +74,7 @@ installPlugins() {
     done
 }
 
-installWidgets() {
+function installWidgets() {
     WIDGETS=(
         engine-status
         global-health
