@@ -162,6 +162,7 @@ installEMS() {
     # Install widgets
     WIDGETS=(
         bam-ba-list
+        bam-ba-listing
         mbi-ba-mtbf-mtrs
         mbi-ba-availability-graph-day
         mbi-ba-availability-gauge
