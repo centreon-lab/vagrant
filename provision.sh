@@ -59,18 +59,25 @@ function installPlugins() {
 
     CENTREON_HOST="http://localhost"
     CURL_CMD="curl "
-    API_TOKEN=$(curl -q -d "username=admin&password=${CENTREON_ADMIN_PASSWD}" \
-        "${CENTREON_HOST}/centreon/api/index.php?action=authenticate" \
-        | cut -f2 -d":" | sed -e "s/\"//g" -e "s/}//"
-    )
 
     for PLUGIN in "${PLUGINS[@]}"; do
         JSON_PLUGIN="{\"slug\": \"${PLUGIN}\", \"version\": $(echo $SLUGS | jq ".data[].attributes | select(.slug | contains(\"${PLUGIN}\")).version"), \"action\": \"install\"}"
-        ${CURL_CMD} -X POST \
-            -H "Content-Type: application/json" \
-            -H "centreon-auth-token: ${API_TOKEN}"\
-            -d "{\"pluginpack\":[${JSON_PLUGIN}]}" \
-            "${CENTREON_HOST}/centreon/api/index.php?object=centreon_pp_manager_pluginpack&action=installupdate"
+        STATUS=0
+        while [ $STATUS -eq 0 ]; do
+            API_TOKEN=$(curl -q -d "username=admin&password=${CENTREON_ADMIN_PASSWD}" \
+                "${CENTREON_HOST}/centreon/api/index.php?action=authenticate" \
+                | cut -f2 -d":" | sed -e "s/\"//g" -e "s/}//"
+            )
+            CURL_OUTPUT=$(${CURL_CMD} -X POST \
+                -H "Content-Type: application/json" \
+                -H "centreon-auth-token: ${API_TOKEN}"\
+                -d "{\"pluginpack\":[${JSON_PLUGIN}]}" \
+                "${CENTREON_HOST}/centreon/api/index.php?object=centreon_pp_manager_pluginpack&action=installupdate"
+            )
+            if ! [ $(echo $CURL_OUTPUT | grep "Forbidden") ]; then
+                STATUS=1
+            fi
+        done
     done
 }
 
@@ -130,9 +137,10 @@ function initialConfiguration() {
     done
 
     # Apply configuration
+    centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -a APPLYCFG -v 1
+    systemctl restart centreon
     systemctl restart cbd
     systemctl restart centengine
-    centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -a APPLYCFG -v 1
 }
 
 timedatectl set-timezone Europe/Paris
