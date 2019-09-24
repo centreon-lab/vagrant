@@ -272,7 +272,7 @@ yum-config-manager --enable 'centreon-testing*'
 ##yum install -y centreon-base-config-centreon-engine
 
 # Devel version
-wget -O /etc/yum.repos.d/centreon-web-devel.repo http://repo.centreon.com/yum/internal/19.10/el7/noarch/web/centreon-web-19.10.0-beta.3-1568886926.1cdc58ef4/centreon-internal.repo
+wget -O /etc/yum.repos.d/centreon-web-devel.repo http://repo.centreon.com/yum/internal/19.10/el7/noarch/web/centreon-web-19.10.0-beta.3-1569334484.ee14bbb6f/centreon-internal.repo
 sed -i 's/srvi-repo.int.centreon.com/repo.centreon.com/' /etc/yum.repos.d/centreon-web-devel.repo
 yum install -y centreon
 
