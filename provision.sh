@@ -14,7 +14,7 @@ RPM_CENTREON_MAP="http://repo.centreon.com/yum/internal/19.10/el7/noarch/map-ser
 RPM_CENTREON_BAM="http://repo.centreon.com/yum/internal/19.10/el7/noarch/bam/centreon-bam-server-19.10.0-1569000359.bc39b8a1/centreon-bam-server-19.10.0-1569000359.bc39b8a1.el7.centos.noarch.rpm"
 RPM_CENTREON_MBI="http://repo.centreon.com/yum/internal/19.10/el7/noarch/mbi-web/centreon-bi-server-19.10.0-1568985622.d46f005/centreon-bi-server-19.10.0-1568985622.d46f005.el7.centos.noarch.rpm"
 
-InstallDbCentreon() {
+function InstallDbCentreon() {
 
     CENTREON_HOST="http://localhost"
     COOKIE_FILE="/tmp/install.cookie"
@@ -50,32 +50,43 @@ InstallDbCentreon() {
         --data "send_statistics=1"
 }
 
-installPlugins() {
+function installPlugins() {
+
+    SLUGS=$(wget -O - -q 'https://api.imp.centreon.com/api/pluginpack/pluginpack?sort=catalog_level&by=asc&page[number]=1&page[size]=20')
+
     PLUGINS=(
-        '{"slug": "base-generic", "version": "3.2.1", "action": "install"}'
-        '{"slug": "applications-databases-mysql", "version": "3.1.3", "action": "install"}'
-        '{"slug": "operatingsystems-linux-snmp", "version": "3.2.1", "action": "install"}'
-        '{"slug": "applications-monitoring-centreon-database", "version":"3.3.0", "action": "install"}'
-        '{"slug": "applications-monitoring-centreon-central", "version": "3.3.3", "action": "install"}'
+      base-generic
+      applications-databases-mysql
+      operatingsystems-linux-snmp
+      applications-monitoring-centreon-database
+      applications-monitoring-centreon-central
     )
 
     CENTREON_HOST="http://localhost"
     CURL_CMD="curl "
-    API_TOKEN=$(curl -q -d "username=admin&password=${CENTREON_ADMIN_PASSWD}" \
-        "${CENTREON_HOST}/centreon/api/index.php?action=authenticate" \
-        | cut -f2 -d":" | sed -e "s/\"//g" -e "s/}//"
-    )
 
     for PLUGIN in "${PLUGINS[@]}"; do
-        ${CURL_CMD} -X POST \
-            -H "Content-Type: application/json" \
-            -H "centreon-auth-token: ${API_TOKEN}"\
-            -d "{\"pluginpack\":[${PLUGIN}]}" \
-            "${CENTREON_HOST}/centreon/api/index.php?object=centreon_pp_manager_pluginpack&action=installupdate"
+        JSON_PLUGIN="{\"slug\": \"${PLUGIN}\", \"version\": $(echo $SLUGS | jq ".data[].attributes | select(.slug | contains(\"${PLUGIN}\")).version"), \"action\": \"install\"}"
+        STATUS=0
+        while [ $STATUS -eq 0 ]; do
+            API_TOKEN=$(curl -q -d "username=admin&password=${CENTREON_ADMIN_PASSWD}" \
+                "${CENTREON_HOST}/centreon/api/index.php?action=authenticate" \
+                | cut -f2 -d":" | sed -e "s/\"//g" -e "s/}//"
+            )
+            CURL_OUTPUT=$(${CURL_CMD} -X POST \
+                -H "Content-Type: application/json" \
+                -H "centreon-auth-token: ${API_TOKEN}"\
+                -d "{\"pluginpack\":[${JSON_PLUGIN}]}" \
+                "${CENTREON_HOST}/centreon/api/index.php?object=centreon_pp_manager_pluginpack&action=installupdate"
+            )
+            if ! [ $(echo $CURL_OUTPUT | grep "Forbidden") ]; then
+                STATUS=1
+            fi
+        done
     done
 }
 
-installWidgets() {
+function installWidgets() {
     WIDGETS=(
         engine-status
         global-health
@@ -109,7 +120,7 @@ installWidgets() {
     done
 }
 
-installEMS() {
+function installEMS() {
 
     # After Centreon configuration, install modules EMS
     if [ ! "$(rpm -aq | grep centreon-map-server)" ]; then
@@ -206,7 +217,7 @@ installEMS() {
     done
 }
 
-sendLicenses() {
+function sendLicenses() {
     CENTREON_HOST="http://localhost"
     CURL_CMD="curl -q -o /dev/null"
     API_TOKEN=$(curl -q -d "username=admin&password=${CENTREON_ADMIN_PASSWD}" \
@@ -220,6 +231,34 @@ sendLicenses() {
         -H "centreon-auth-token: ${API_TOKEN}"\
         -F "file[]=@/tmp/licenses.zip" \
         "${CENTREON_HOST}/centreon/api/index.php?object=centreon_license&action=file"
+}
+
+function initialConfiguration() {
+    # Add server and set snmp configuration
+    centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -o HG -a add -v "Linux;Linux servers"
+    centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -o HOST -a ADD -v "centreon-central;Centreon Central;127.0.0.1;App-Monitoring-Centreon-Central-custom|App-Monitoring-Centreon-Database-custom;central;Linux"
+    centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -o HOST -a setmacro -v "centreon-central;MYSQLPASSWORD;${MYSQL_PASSWD}"
+    centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -o HOST -a setparam -v "centreon-central;snmp_community;public"
+    centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -o HOST -a setparam -v "centreon-central;snmp_version;2c"
+    centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -o HOST -a applytpl -v "centreon-central"
+
+    # add a plugin to monitor each ethernet interface
+    ip -o link show | awk -F': ' '{print $2}' | grep -v 'lo' | while read IFNAME; do
+        centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -o SERVICE -a add -v "centreon-central;Interface-${IFNAME};OS-Linux-Traffic-Generic-Name-SNMP"
+        centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -o SERVICE -a setmacro -v "centreon-central;Interface-${IFNAME};INTERFACENAME;${IFNAME}"
+    done
+
+    # add mount point from partition of system to monitor
+    lsblk -o MOUNTPOINT | sed -e 1d -e '/^$/d' | while read MP; do
+        centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -o SERVICE -a add -v "centreon-central;Mountpoint-${MP};OS-Linux-Disk-Generic-Name-SNMP"
+        centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -o SERVICE -a setmacro -v "centreon-central;Mountpoint-${MP};DISKNAME;${MP}"
+    done
+
+    # Apply configuration
+    centreon -u admin -p ${CENTREON_ADMIN_PASSWD} -a APPLYCFG -v 1
+    systemctl restart centreon
+    systemctl restart cbd
+    systemctl restart centengine
 }
 
 timedatectl set-timezone Europe/Paris
@@ -269,6 +308,11 @@ systemctl start cbd
 systemctl start snmpd
 systemctl start snmptrapd
 
+# Install JQ tool (https://stedolan.github.io/jq/)
+# to help manage json output in shell
+wget -O /usr/sbin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+chmod +x /usr/sbin/jq
+
 # Install License files
 sendLicenses
 
@@ -280,3 +324,6 @@ installPlugins
 
 # Install EMS components
 installEMS
+
+# Apply initial configuration from owner server
+initialConfiguration
