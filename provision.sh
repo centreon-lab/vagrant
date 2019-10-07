@@ -1,5 +1,7 @@
 #!/bin/sh
 
+DEBUG=1
+
 MYSQL_HOST="localhost"
 MYSQL_PORT="3306"
 MYSQL_USER="centreon"
@@ -13,7 +15,7 @@ function InstallDbCentreon() {
 
     CENTREON_HOST="http://localhost"
     COOKIE_FILE="/tmp/install.cookie"
-    CURL_CMD="curl -q -b ${COOKIE_FILE}"
+    CURL_CMD="curl -q -o /dev/null -b ${COOKIE_FILE}"
 
     curl -q -c ${COOKIE_FILE} ${CENTREON_HOST}/centreon/install/install.php
     ${CURL_CMD} "${CENTREON_HOST}/centreon/install/steps/step.php?action=stepContent"
@@ -29,7 +31,7 @@ function InstallDbCentreon() {
         --data "admin_password=${CENTREON_ADMIN_PASSWD}&confirm_password=${CENTREON_ADMIN_PASSWD}&firstname=${CENTREON_ADMIN_NAME}&lastname=${CENTREON_ADMIN_NAME}&email=${CENTREON_ADMIN_EMAIL}"
     ${CURL_CMD} "${CENTREON_HOST}/centreon/install/steps/step.php?action=nextStep"
     ${CURL_CMD} "${CENTREON_HOST}/centreon/install/steps/process/process_step6.php" \
-        --data "address=${MYSQL_HOST}&port=${MYSQL_PORT}&root_password=${MYSQL_ROOT_PASSWORD}&db_configuration=centreon&db_storage=centreon_storage&db_user=${MYSQL_USER}&db_password=${MYSQL_PASSWD}&db_password_confirm=${MYSQL_PASSWD}"
+        --data "address=${MYSQL_HOST}&port=${MYSQL_PORT}&root_user=root&root_password=${MYSQL_ROOT_PASSWORD}&db_configuration=centreon&db_storage=centreon_storage&db_user=${MYSQL_USER}&db_password=${MYSQL_PASSWD}&db_password_confirm=${MYSQL_PASSWD}"
     ${CURL_CMD} "${CENTREON_HOST}/centreon/install/steps/step.php?action=nextStep"
     ${CURL_CMD} "${CENTREON_HOST}/centreon/install/steps/process/configFileSetup.php" -X POST
     ${CURL_CMD} "${CENTREON_HOST}/centreon/install/steps/process/installConfigurationDb.php" -X POST
@@ -46,6 +48,11 @@ function InstallDbCentreon() {
 }
 
 function installPlugins() {
+
+    # Install JQ tool (https://stedolan.github.io/jq/)
+    # to help manage json output in shell
+    wget -O /usr/sbin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
+    chmod +x /usr/sbin/jq
 
     SLUGS=$(wget -O - -q 'https://api.imp.centreon.com/api/pluginpack/pluginpack?sort=catalog_level&by=asc&page[number]=1&page[size]=20')
 
@@ -70,10 +77,13 @@ function installPlugins() {
             )
             CURL_OUTPUT=$(${CURL_CMD} -X POST \
                 -H "Content-Type: application/json" \
-                -H "centreon-auth-token: ${API_TOKEN}"\
+                -H "centreon-auth-token: $(read <<<"$API_TOKEN";echo "$REPLY")" \ \
                 -d "{\"pluginpack\":[${JSON_PLUGIN}]}" \
                 "${CENTREON_HOST}/centreon/api/index.php?object=centreon_pp_manager_pluginpack&action=installupdate"
             )
+            if [ $DEBUG -eq 1 ]; then
+                echo "Curl ouput: ${CURL_OUTPUT}"
+            fi
             if ! [ $(echo $CURL_OUTPUT | grep "Forbidden") ]; then
                 STATUS=1
             fi
@@ -98,20 +108,31 @@ function installWidgets() {
     )
 
     CENTREON_HOST="http://localhost"
-    CURL_CMD="curl -q -o /dev/null"
-    API_TOKEN=$(curl -q -d "username=admin&password=${CENTREON_ADMIN_PASSWD}" \
-        "${CENTREON_HOST}/centreon/api/index.php?action=authenticate" \
-        | cut -f2 -d":" | sed -e "s/\"//g" -e "s/}//"
-    )
+    CURL_CMD="curl "
+
 
     for WIDGET in "${WIDGETS[@]}"; do
         # Install package
         yum install -y centreon-widget-${WIDGET}
-        # Configure widget in Centreon
-        ${CURL_CMD} -X POST \
-            -H "Content-Type: application/json" \
-            -H "centreon-auth-token: ${API_TOKEN}"\
-            "${CENTREON_HOST}/centreon/api/index.php?object=centreon_module&action=install&id=${WIDGET}&type=widget"
+        STATUS=0
+        while [ $STATUS -eq 0 ]; do
+            API_TOKEN=$(curl -q -d "username=admin&password=${CENTREON_ADMIN_PASSWD}" \
+                "${CENTREON_HOST}/centreon/api/index.php?action=authenticate" \
+                | cut -f2 -d":" | sed -e "s/\"//g" -e "s/}//"
+            )
+            # Configure widget in Centreon
+            CURL_OUTPUT=$(${CURL_CMD} -X POST \
+                -H "Content-Type: application/json" \
+                -H "centreon-auth-token: $(read <<<"$API_TOKEN";echo "$REPLY")" \ \
+                "${CENTREON_HOST}/centreon/api/index.php?object=centreon_module&action=install&id=${WIDGET}&type=widget"
+            )
+            if [ $DEBUG -eq 1 ]; then
+                echo "Curl ouput: ${CURL_OUTPUT}"
+            fi
+            if ! [ $(echo $CURL_OUTPUT | grep "Forbidden") ]; then
+                STATUS=1
+            fi
+        done
     done
 }
 
@@ -149,6 +170,7 @@ sed -i 's/enforcing/disabled/' /etc/selinux/config
 yum upgrade -y
 yum install -y centos-release-scl wget curl
 yum install -y yum-utils http://yum.centreon.com/standard/19.10/el7/stable/noarch/RPMS/centreon-release-19.10-1.el7.centos.noarch.rpm
+yum-config-manager --enable 'centreon-canary*'
 yum-config-manager --enable 'centreon-testing*'
 #curl -sS https://downloads.mariadb.com/MariaDB/mariadb_repo_setup | bash
 #yum install -y centreon-base-config-centreon-engine
@@ -185,11 +207,6 @@ systemctl start mysqld
 systemctl start cbd
 systemctl start snmpd
 systemctl start snmptrapd
-
-# Install JQ tool (https://stedolan.github.io/jq/)
-# to help manage json output in shell
-wget -O /usr/sbin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64
-chmod +x /usr/sbin/jq
 
 # Install widgets and configure
 installWidgets
