@@ -168,7 +168,7 @@ timedatectl set-timezone Europe/Paris
 setenforce 0
 sed -i 's/enforcing/disabled/' /etc/selinux/config
 yum upgrade -y
-yum install -y centos-release-scl wget curl
+yum install -y centos-release-scl wget curl ntp
 yum install -y yum-utils http://yum.centreon.com/standard/19.10/el7/stable/noarch/RPMS/centreon-release-19.10-1.el7.centos.noarch.rpm
 yum-config-manager --enable 'centreon-canary*'
 yum-config-manager --enable 'centreon-testing*'
@@ -189,6 +189,7 @@ systemctl restart cbd
 
 # Enable all others services
 systemctl enable httpd24-httpd
+systemctl enable ntpd
 systemctl enable snmpd
 systemctl enable snmptrapd
 systemctl enable rh-php72-php-fpm
@@ -204,6 +205,7 @@ systemctl disable firewalld
 systemctl start rh-php72-php-fpm
 systemctl start httpd24-httpd
 systemctl start mysqld
+systemctl start ntpd
 systemctl start cbd
 systemctl start snmpd
 systemctl start snmptrapd
